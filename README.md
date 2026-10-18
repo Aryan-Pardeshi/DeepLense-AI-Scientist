@@ -8,14 +8,12 @@ Agentic AI for autonomous scientific workflows in gravitational lensing research
 <div align="center">
   <a href="https://www.python.org/"><img src="https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white" alt="Python"></a>
   <a href="https://ai.pydantic.dev/"><img src="https://img.shields.io/badge/Pydantic-AI-E92063?logo=pydantic&logoColor=white" alt="Pydantic AI"></a>
-  <a href="https://github.com/ML4SCI/DeepLense"><img src="https://img.shields.io/badge/DeepLense-ML4SCI-blueviolet?logo=telescope&logoColor=white" alt="DeepLense"></a>
+  <a href="https://deeplense.org/"><img src="https://img.shields.io/badge/DeepLense-ML4SCI-blueviolet?logo=telescope&logoColor=white" alt="DeepLense"></a>
 </div>
 
 <p align="center">
-  <a href="./docs/DOCUMENTATION.md"><strong>Technical Documentation</strong></a>
-</p>
-
-<p align="center">
+  <a href="https://deeplense.org/"><strong>DeepLense Website</strong></a> ·
+  <a href="./docs/DOCUMENTATION.md"><strong>Technical Documentation</strong></a> ·
   <a href="./docs/AGENT_TRACKER.md"><strong>Agent Tracker</strong></a>
 </p>
 
