@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import subprocess
 
 import numpy as np
 import pytest
@@ -115,4 +117,44 @@ def test_execresult_returncode_defaults_to_sentinel():
     # No subprocess ran (docker missing / timeout): returncode must not look like
     # a successful exit.
     assert ExecResult(ok=False).returncode == -1
+
+
+def test_docker_job_root_defaults_under_home(monkeypatch, tmp_path):
+    from dlens.tools._sandbox import _docker_job_root
+
+    # $HOME is shared with the Docker VM by Colima and Docker Desktop; /var/folders isn't.
+    monkeypatch.delenv("DLENS_SANDBOX_DIR", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    root = _docker_job_root()
+    assert root == str(tmp_path / ".cache" / "dlens" / "sandbox")
+    assert os.path.isdir(root)
+
+    monkeypatch.setenv("DLENS_SANDBOX_DIR", str(tmp_path / "shared"))
+    assert _docker_job_root() == str(tmp_path / "shared")
+
+
+def _fake_docker_run(seen):
+    """Stand-in for `docker run`: records the bind-mounted job dir and writes the image."""
+
+    def run(cmd, **kwargs):
+        job_dir = cmd[cmd.index("-v") + 1].removesuffix(":/work")
+        seen["job_dir"] = job_dir
+        seen["prog_written"] = os.path.exists(os.path.join(job_dir, "prog.py"))
+        np.save(os.path.join(job_dir, "output.npy"), np.ones((8, 8)))
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    return run
+
+
+def test_docker_sandbox_mounts_a_job_dir_under_the_job_root(monkeypatch, tmp_path):
+    from dlens.tools import _sandbox
+
+    monkeypatch.setenv("DLENS_SANDBOX_DIR", str(tmp_path))
+    seen = {}
+    monkeypatch.setattr(_sandbox.subprocess, "run", _fake_docker_run(seen))
+    r = DockerSandbox().run(_GOOD)
+    assert r.ok
+    assert os.path.dirname(seen["job_dir"]) == str(tmp_path)
+    assert seen["prog_written"]
+    assert np.load(r.output_path).shape == (8, 8)
 

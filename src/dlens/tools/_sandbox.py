@@ -26,6 +26,22 @@ from typing import Optional, Protocol, runtime_checkable
 _OUTPUT_NAME = "output.npy"
 
 
+def _docker_job_root() -> str:
+    """Parent dir for DockerSandbox job dirs. Override with DLENS_SANDBOX_DIR.
+
+    The job dir is bind-mounted into the container, so the Docker daemon must be
+    able to see it. On macOS, ``tempfile`` puts it under /var/folders, which Colima
+    does not share with its VM: the container then sees an empty /work and every
+    run fails with "can't open file '/work/prog.py'". $HOME is shared by default
+    by both Colima and Docker Desktop.
+    """
+    root = os.getenv("DLENS_SANDBOX_DIR") or os.path.join(
+        os.path.expanduser("~"), ".cache", "dlens", "sandbox"
+    )
+    os.makedirs(root, exist_ok=True)
+    return root
+
+
 @dataclass
 class ExecResult:
     """Result of running a generated script in a sandbox."""
@@ -86,7 +102,7 @@ class DockerSandbox:
         self.image = image
 
     def run(self, code: str, *, timeout: float = 120.0) -> ExecResult:
-        workdir = tempfile.mkdtemp(prefix="dlens_docker_sandbox_")
+        workdir = tempfile.mkdtemp(prefix="dlens_docker_sandbox_", dir=_docker_job_root())
         with open(os.path.join(workdir, "prog.py"), "w") as fh:
             fh.write(code)
         host_out = os.path.join(workdir, _OUTPUT_NAME)
