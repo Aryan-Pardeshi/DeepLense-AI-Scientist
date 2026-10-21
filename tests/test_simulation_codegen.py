@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import os
 import subprocess
+import tempfile
 
 import numpy as np
 import pytest
@@ -24,8 +26,16 @@ _NO_OUTPUT = "print('nothing written')\n"
 
 def test_local_sandbox_runs_and_produces_output():
     r = LocalSandbox().run(_GOOD)
-    assert r.ok and r.output_path
-    assert np.load(r.output_path).shape == (64, 64)
+    assert r.ok and r.output
+    assert np.load(io.BytesIO(r.output)).shape == (64, 64)
+
+
+def test_local_sandbox_deletes_its_job_dir(monkeypatch, tmp_path):
+    monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
+    LocalSandbox().run(_GOOD)
+    LocalSandbox().run(_NO_OUTPUT)
+    LocalSandbox().run("import sys; sys.exit(3)\n")
+    assert list(tmp_path.iterdir()) == []
 
 
 def test_validate_output_pass_and_fail():
@@ -94,7 +104,7 @@ def test_exit_zero_but_no_output_reports_ran_true():
     # output — not as a process failure (that wrong signal used to reach the
     # retry prompt).
     r = LocalSandbox().run(_NO_OUTPUT)
-    assert r.ok is True and r.returncode == 0 and r.output_path is None
+    assert r.ok is True and r.returncode == 0 and r.output is None
     v = validate_output(r)
     assert not v.passed
     assert v.checks["ran"] is True
@@ -140,7 +150,7 @@ def _fake_docker_run(seen):
         job_dir = cmd[cmd.index("-v") + 1].removesuffix(":/work")
         seen["job_dir"] = job_dir
         seen["prog_written"] = os.path.exists(os.path.join(job_dir, "prog.py"))
-        np.save(os.path.join(job_dir, "output.npy"), np.ones((8, 8)))
+        np.save(os.path.join(job_dir, "output.npy"), np.arange(64.0).reshape(8, 8))
         return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
 
     return run
@@ -156,5 +166,8 @@ def test_docker_sandbox_mounts_a_job_dir_under_the_job_root(monkeypatch, tmp_pat
     assert r.ok
     assert os.path.dirname(seen["job_dir"]) == str(tmp_path)
     assert seen["prog_written"]
-    assert np.load(r.output_path).shape == (8, 8)
+    # The image comes back in memory and the job dir is gone.
+    assert np.load(io.BytesIO(r.output)).shape == (8, 8)
+    assert validate_output(r).passed
+    assert list(tmp_path.iterdir()) == []
 
